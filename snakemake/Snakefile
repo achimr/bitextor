@@ -987,6 +987,10 @@ rule httrack_download:
 rule wget_download:
     output:
         '{dir}/warc'.format(dir=permanent)+'/{target}/wget.warc.xz'
+    params:
+        url="http://{target}"
+    priority: 10
+    shell:
         'echo hostname=$HOSTNAME; '
         'DIRNAME=$(mktemp -d {TMPDIR}/downloaded.{wildcards.target}.XXXXXX); '
         '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-wget.py --url {params.url} --output-path $DIRNAME {CRAWLTIMELIMIT} {USERAGENT} {CRAWLFILETYPES}; '
