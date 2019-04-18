@@ -146,7 +146,7 @@ for record in f:
                     for script in soup(["script", "style", "img"]):
                         script.extract()  # rip it out
 
-                    plaintext = soup.get_text()
+                    plaintext = soup.get_text(" ")
                     plaintext = re.sub(r"\n+", "\n",
                                        re.sub(r" *\n *", "\n", re.sub(r" +", " ", re.sub(r"\r", "", plaintext))))
 
