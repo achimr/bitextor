@@ -88,6 +88,7 @@ def ValidateArgs(config):
            'permanentDir': {'required': True, 'type': 'string'},
            'transientDir': {'required': True, 'type': 'string'},
            'boilerpipeCleaning': {'type': 'boolean'},
+           'pdf-converter' : {'type' : 'string'},
            'httrack': {'type': 'boolean'}, #deprecated
            'crawler': {'type': 'string'},
            'crawlTld': {'type': 'boolean'},
@@ -105,6 +106,7 @@ def ValidateArgs(config):
            'crawlerUserAgent': {'type': 'string'},
            'crawlSizeLimit': {'type': 'string'},
            'crawlTimeLimit': {'type': 'string'},
+           'crawlWait': {'type': 'integer'},
            'crawlFileTypes': {'type': 'string'},
            'crawlPageLimit': {'type': 'integer'},
            'crawlerConnectionTimeout': {'type': 'integer'},
@@ -265,6 +267,11 @@ if "boilerpipeCleaning" in config and config["boilerpipeCleaning"]==True:
 else:
   boilerpipeCleaning = ''
 
+if "pdf-converter" in config and config["pdf-converter"]=="pdf-extract":
+  usepdfextract = "--pdfextract"
+else:
+  usepdfextract = ""
+
 #Option to use HTTrack for crawling instead of the native bitextor crawler
 if "httrack" in config and config["httrack"]==True:
   CRAWLTARGET="httrack"
@@ -283,23 +290,15 @@ else:
 #Tokenisers
 if "LANG1Tokenizer" in config:
   WORDTOK1=config["LANG1Tokenizer"]
-else:
-  WORDTOK1="{BITEXTOR}/preprocess/moses/tokenizer/tokenizer.perl -l {LANG1} -a -b -q".format(BITEXTOR=BITEXTOR, LANG1=LANG1)
 
 if "LANG2Tokenizer" in config:
   WORDTOK2=config["LANG2Tokenizer"]
-else:
-  WORDTOK2="{BITEXTOR}/preprocess/moses/tokenizer/tokenizer.perl -l {LANG2} -a -b -q".format(BITEXTOR=BITEXTOR, LANG2=LANG2)
 
 if "LANG1SentenceSplitter" in config:
   SENTTOK1=config["LANG1SentenceSplitter"]
-else:
-  SENTTOK1="{BITEXTOR}/preprocess/moses/ems/support/split-sentences.perl -b -l {LANG1}".format(BITEXTOR=BITEXTOR, LANG1=LANG1)
 
 if "LANG2SentenceSplitter" in config:
   SENTTOK2=config["LANG2SentenceSplitter"]
-else:
-  SENTTOK2="{BITEXTOR}/preprocess/moses/ems/support/split-sentences.perl -b -l {LANG2}".format(BITEXTOR=BITEXTOR, LANG2=LANG2)
 
 ############ OPTIONS FOR THE NATIVE BITEXTOR CRAWLER ############
 
@@ -327,6 +326,10 @@ if "crawlTimeLimit" in config:
 else:
   CRAWLTIMELIMIT=""
 
+if "crawlWait" in config:
+  CRAWLWAIT="--wait "+str(config["crawlWait"])
+else:
+  CRAWLWAIT=""
 if "crawlPageLimit" in config:
   CRAWLPAGELIMIT="-p "+str(config["crawlPageLimit"])
 else:
@@ -362,9 +365,9 @@ else:
   CONTINUECRAWL=""
 
 
-############ OPTIONS FOR THE MALIGN ALIGNER ############
+############ OPTIONS FOR THE MT DOCUMENT ALIGNER ############
 
-#If documentAligner is enabled, Marek Střelec's MT-based document aligner is used [https://github.com/paracrawl/Malign]
+#If documentAligner is enabled, Marek Střelec's MT-based document aligner is used (bitextor/document-aligner)
 if "documentAligner" in config:
   if config["documentAligner"] == "externalMT":
     MT_COMMAND=config["alignerCmd"]
@@ -477,7 +480,7 @@ def FilterTLD(tlds):
 def InitConcatLogicLink(domains):
     for tld,hosts in domains.items():
         if len(hosts) == 1 and  os.path.isfile("{permanent}/warc/{host}/{crawler}.warc.xz".format(permanent=permanent, host=hosts[0], crawler=CRAWLTARGET)) and not os.path.isfile("{transient}/{tld}/concat.warc.xz".format(tld=tld,transient=transient)):
-            cmd="mkdir -p {transient}/{tld}; ln -s {permanent}/warc/{host}/{crawler}.warc.xz {transient}/{tld}/concat.warc.xz".format(permanent=permanent, host=hosts[0], crawler=CRAWLTARGET, transient=transient,
+            cmd="mkdir -p {transient}/{tld}; ln -sfn {permanent}/warc/{host}/{crawler}.warc.xz {transient}/{tld}/concat.warc.xz".format(permanent=permanent, host=hosts[0], crawler=CRAWLTARGET, transient=transient,
  tld=tld)
             shell(cmd)
 
@@ -583,7 +586,7 @@ def LinkedHosts(permanent, dir, hosts, linkedHostsAction):
                 dest = "{permanent}/warc/{host}".format(permanent=permanent, host=host)
 
                 if not (os.path.exists(dest) or os.path.islink(dest)):
-                    cmd = "ln -s {dir}/warc/{host} {dest}".format(dir=dir, host=host, dest=dest)
+                    cmd = "ln -sfn {dir}/warc/{host} {dest}".format(dir=dir, host=host, dest=dest)
                     #print(cmd)
                     shell(cmd)
             else:
@@ -959,7 +962,6 @@ rule create_config:
 
 
 #================================== CRAWLING ======================================#
-#"http://www.elenacaffe1863.com/", "http://elenacaffe1863.com/", "http://vade-retro.fr"
 rule creepy_download:
     params:
         url="http://{target}"
@@ -968,7 +970,7 @@ rule creepy_download:
     priority: 10
     shell:
         #'echo {params.url}; '
-        '{PROFILING} python3 {BITEXTOR}/bitextor-creepy.py {TLD_CRAWL} {CRAWLSIZELIMIT} {CRAWLTIMELIMIT} {CRAWLJOBS} {CRAWLTIMEOUT} {CRAWLDUMPARGS} {CONTINUECRAWL} {USERAGENT} {params.url} | xz -c -T 0 > {output}'
+        '{PROFILING} python3 {BITEXTOR}/bitextor-creepy.py {TLD_CRAWL} {CRAWLSIZELIMIT} {CRAWLTIMELIMIT} {CRAWLWAIT} {CRAWLJOBS} {CRAWLTIMEOUT} {CRAWLDUMPARGS} {CONTINUECRAWL} {USERAGENT} {params.url} | xz -c -T 0 > {output}'
 
 rule httrack_download:
     output:
@@ -980,7 +982,7 @@ rule httrack_download:
         'echo hostname=$HOSTNAME; '
         #'mkdir -p {permanent}/warc/{wildcards.target} ; '
         'DIRNAME=$(mktemp -d {TMPDIR}/downloaded.{wildcards.target}.XXXXXX); '
-        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-httrack.py --url {params.url} --output-path $DIRNAME {CRAWLTIMELIMIT} {CRAWLPAGELIMIT} {USERAGENT}; '
+        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-httrack.py --url {params.url} --output-path $DIRNAME {CRAWLTIMELIMIT} {CRAWLPAGELIMIT} {USERAGENT} {CRAWLWAIT}; '
         '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-webdir2warc.sh $DIRNAME | nice ionice -c 3 xz -c -T 0 > {output}; '
         'rm -rf $DIRNAME;'
 
@@ -992,9 +994,10 @@ rule wget_download:
     priority: 10
     shell:
         'echo hostname=$HOSTNAME; '
-        'DIRNAME=$(mktemp -d {TMPDIR}/downloaded.{wildcards.target}.XXXXXX); '
-        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-wget.py --url {params.url} --output-path $DIRNAME {CRAWLTIMELIMIT} {USERAGENT} {CRAWLFILETYPES}; '
-        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-webdir2warc.sh $DIRNAME | nice ionice -c 3 xz -c -T 0 > {output}; '
+        'DIRNAME=$(mktemp -d "{TMPDIR}/downloaded.{wildcards.target}.XXXXXX"); '
+        'WGETWARCPATH=$DIRNAME/output;'
+        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-wget.py --url {params.url} --output-path "$DIRNAME" {CRAWLTIMELIMIT} {USERAGENT} {CRAWLFILETYPES} {CRAWLWAIT} --warc $WGETWARCPATH; '
+        'cat $WGETWARCPATH.warc | nice ionice -c 3 xz -c -T 0 > {output};'
         'rm -rf $DIRNAME;'
 
 
@@ -1013,7 +1016,7 @@ rule concat_subdomains:
     run:
         assert(len(input))
         if len(input) == 1:
-            cmd = "ln -s {input} {output}; "
+            cmd = "ln -sfn {input} {output}; "
         else:
             cmd = 'xzcat -T 0 {input} -f | xz -c -T 0 > {output}; '
         shell(cmd)
@@ -1032,8 +1035,8 @@ rule warc2preprocess:
     priority: 8
     shell:
         #By removing the checkpoint every time, we ensure that rule split_warc will be re-run every time, which allows to resume the pipeline if this step breaks
-        'xzcat {input} -f | {PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-warc2preprocess.py {boilerpipeCleaning} --output-dir {wildcards.dir} --lang1 {LANG1} --lang2 {LANG2}; '
-        'if [ "{boilerpipeCleaning}" == "" ]; then ln -s {output.html} {output.deboil}; fi'
+        '{PROFILING} nice ionice -c 3 {BITEXTOR}/bitextor-warc2preprocess.py {boilerpipeCleaning} --output-dir {wildcards.dir} --lang1 {LANG1} --lang2 {LANG2} --input {input} {usepdfextract}; '
+        'if [ "{boilerpipeCleaning}" == "" ]; then ln -sfn {output.html} {output.deboil}; fi'
 
 #================================== DICTIONARY-BASED DOCUMENT ALIGNMENT ==================================#
 rule lettr2idx:
@@ -1444,7 +1447,7 @@ rule bleualign:
         "{dir}/bleualign/align.info.gz"
     shell:
         "mkdir -p {wildcards.dir}/bleualign; "
-        "{PROFILING} {BITEXTOR}/bleualign-cpp/bleualign_cpp --text1 {input.extracted_l1} --text2 {input.extracted_l2} --text2translated {input.translated} --matches {input.matches} --doc-threshold {DOC_THRESHOLD} --bleu-threshold {BLEU_THRESHOLD} --output-dir {wildcards.dir}/bleualign"
+        "{PROFILING} {BITEXTOR}/bleualign-cpp/bleualign_cpp --text1 {input.extracted_l1} --text2 {input.extracted_l2} --text1translated {input.translated} --matches {input.matches} --doc-threshold {DOC_THRESHOLD} --bleu-threshold {BLEU_THRESHOLD} --output-dir {wildcards.dir}/bleualign"
 
 #################### TRAIN BILINGUAL DICTIONARIES #############################
 

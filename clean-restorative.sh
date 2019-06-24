@@ -15,21 +15,6 @@ cut -f 5- $INPUT_FILE > ${INPUT_FILE}.d/f5
 
 restorative-cleaning/restorative-cleaning.sh -s $SL -t $TL -f ${INPUT_FILE}.d/f3 \
                      -l ${INPUT_FILE}.d/f4 -o ${INPUT_FILE}.od &>/dev/null
-exp=()
-exp+=('bg')
-exp+=('cs')
-exp+=('sk')
-
-
-if [[ ${exp[*]}  =~ $TL ]];
-then
-	cat ${INPUT_FILE}.d/f4 > ${INPUT_FILE}.od/clean-corpus.${TL}
-fi
-
-if [[ ${exp[*]}  =~ $SL ]];
-then
-	cat ${INPUT_FILE}.d/f3 > ${INPUT_FILE}.od/clean-corpus.${SL}
-fi
 
 
 paste ${INPUT_FILE}.d/f1 ${INPUT_FILE}.d/f2 \
@@ -39,4 +24,3 @@ paste ${INPUT_FILE}.d/f1 ${INPUT_FILE}.d/f2 \
 
 
 rm -Rf $INPUT_FILE ${INPUT_FILE}.d ${INPUT_FILE}.od
-
