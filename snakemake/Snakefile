@@ -81,6 +81,8 @@ def ValidateArgs(config):
             'temp': {'type': 'string'},
             'hunalignThreshold': {'type': 'float'},
             'maxlines': {'type': 'integer'},
+            'maxSegmentRatio': {'type': 'float'},
+            'normalizeUrls': {'type': 'boolean'},
             'alcazar': {'type': 'boolean'},
             'onlyConcat': {'type': 'boolean'},
             'profiling': {'type': 'boolean'},
@@ -243,6 +245,16 @@ if "maxlines" in config:
   MAXLINES=config["maxlines"]
 else:
   MAXLINES=-1
+
+if "maxSegmentRatio" in config:
+  MAXSEGMENTRATIO=config["maxSegmentRatio"]
+else:
+  MAXSEGMENTRATIO=2.0
+
+if "normalizeUrls" in config and config["normalizeUrls"]:
+  NORMALIZEURLS="-u"
+else:
+  NORMALIZEURLS=""
 
 if "alcazar" in config and config["alcazar"]:
   ALCAZAR = "--alcazar"
@@ -1322,7 +1334,6 @@ rule deferred_documents:
         "{dir}/deferred_documents.xz"
     shell:
         'paste <(xzcat {input[0]}) <(xzcat {input[1]}) | {PROFILING} python3 {BITEXTOR}/standoff/deferred-document.py | awk \'{{ print $1 | "xz > {output[0]}"; print $3 | "xz > {output[1]}" }}\''
-
 rule deferred_segments:
     input:
         "{dir}/" + SEGMENTALIGNER + ".segalign.xz",
@@ -1340,7 +1351,7 @@ rule cleansegments:
     output:
         "{dir}/"  + SEGMENTALIGNER + ".segclean.xz"
     shell:
-        'xzcat -T 0 -f {input} | {PROFILING} {BITEXTOR}/bitextor-cleantextalign.py -q {MINQUALITY} -m {MAXLINES} -s | xz -T 0 > {output}'
+        'xzcat -T 0 -f {input} | {PROFILING} {BITEXTOR}/bitextor-cleantextalign.py -q {MINQUALITY} -m {MAXLINES} -r {MAXSEGMENTRATIO} {NORMALIZEURLS} -s | xz -T 0 > {output}'
 
 #================================== POST PROCESSING ==================================#
 
